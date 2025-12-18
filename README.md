@@ -22,8 +22,8 @@
 1.  **Клонуйте репозиторій:**
 
     ```bash
-    git clone <repository_url>
-    cd equipment-condition-prediction
+    git clone https://github.com/dredko25/Intelligent-system-for-predicting-the-technical-condition.git
+    cd Intelligent-system-for-predicting-the-technical-condition
     ```
 
 2.  **Запустіть проєкт:**
