@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="uk">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Моніторинг Обладнання</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding-top: 20px;
+        }
+
+        .device-card {
+            transition: transform 0.2s;
+            border: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .device-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .sensor-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .sensor-label {
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+
+        .status-badge {
+            font-size: 0.9rem;
+            padding: 0.5em 1em;
+        }
+
+        .metric-box {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            height: 100%;
+        }
+
+        /* Анімація оновлення */
+        .updated {
+            background-color: #e8f5e9 !important;
+            transition: background-color 0.5s ease;
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            opacity: 0.9;
+        }
+
+        .rul-value {
+            color: #0d6efd;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="connection-status" class="alert alert-danger connection-status" style="display: none;">
+        З'єднання втрачено
+    </div>
+
+    <div class="container-fluid px-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3 mb-0 text-gray-800">Панель моніторингу обладнання</h1>
+
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-muted small" id="last-global-update">Очікування даних...</span>
+
+                <div class="vr"></div>
+                <div class="d-flex align-items-center">
+                    <span class="fw-bold me-2">{{ user.username }}</span>
+                    <span class="badge bg-secondary me-3">{{ user.role }}</span>
+                    <a href="/logout" class="btn btn-sm btn-outline-danger">Вийти</a>
+                </div>
+            </div>
+        </div>
+
+        <div id="devices-grid" class="row">
+        </div>
+
+        <div id="no-data-message" class="text-center py-5 text-muted">
+            <div class="spinner-border text-primary mb-3" role="status"></div>
+            <p>Очікування підключення пристроїв...</p>
+        </div>
+    </div>
+
+    <template id="device-card-template">
+        <div class="col-xl-4 col-md-6 mb-4 device-wrapper">
+            <div class="card device-card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center bg-white py-3">
+                    <div class="d-flex align-items-center">
+                        <h5 class="mb-0 device-uid fw-bold">DEV-ID</h5>
+                    </div>
+                    <span class="badge rounded-pill status-badge">Статус</span>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <div class="metric-box">
+                                <div class="sensor-label">t повітря</div>
+                                <div class="sensor-value val-air">-</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="metric-box">
+                                <div class="sensor-label">t процесу</div>
+                                <div class="sensor-value val-process">-</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="metric-box">
+                                <div class="sensor-label">Швидкість обертання</div>
+                                <div class="sensor-value val-speed">-</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="metric-box">
+                                <div class="sensor-label">Крутний момент</div>
+                                <div class="sensor-value val-torque">-</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-light border mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="small text-muted">Знос інструменту:</span>
+                            <span class="fw-bold val-wear">-</span>
+                        </div>
+                        <div class="progress" style="height: 6px;">
+                            <div class="progress-bar bg-info wear-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center border-top pt-3">
+                        <div>
+                            <div class="small text-muted">Прогноз RUL:</div>
+                            <div class="h4 mb-0 fw-bold rul-value val-rul">-</div>
+                        </div>
+                        <div class="btn-group">
+                            <a href="#" class="btn btn-outline-primary btn-sm btn-charts">Графіки</a>
+                            <a href="#" class="btn btn-outline-secondary btn-sm btn-history">CSV</a>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-danger mt-3 mb-0 failure-alert" style="display: none;">
+                        🚨 <strong>УВАГА:</strong> <span class="failure-text"></span>
+                    </div>
+                </div>
+                <div class="card-footer bg-light py-2">
+                    <small class="text-muted last-updated">Оновлено: -</small>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script>
+        const devicesGrid = document.getElementById('devices-grid');
+        const template = document.getElementById('device-card-template');
+        const noDataMsg = document.getElementById('no-data-message');
+        const connectionStatus = document.getElementById('connection-status');
+        let ws = null;
+        const userRole = "{{ user.role }}";
+
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/api/ws/live`);
+
+            ws.onopen = () => {
+                connectionStatus.style.display = 'none';
+                console.log('Connected to WebSocket');
+            };
+
+            ws.onclose = () => {
+                connectionStatus.style.display = 'block';
+                connectionStatus.textContent = 'З\'єднання втрачено. Перепідключення...';
+                setTimeout(connect, 3000);
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+                    if (msg.type === 'live_data' || (msg.device_uid && !msg.type)) {
+                        const data = msg.data || msg;
+                        updateDeviceCard(data);
+                        noDataMsg.style.display = 'none';
+                        document.getElementById('last-global-update').textContent =
+                            'Останні дані: ' + new Date().toLocaleTimeString();
+                    }
+                } catch (e) {
+                    console.error('Error parsing message:', e);
+                }
+            };
+        }
+
+        function updateDeviceCard(data) {
+            let card = document.getElementById(`card-${data.device_uid}`);
+
+            // Якщо картки немає - створюємо
+            if (!card) {
+                const clone = template.content.cloneNode(true);
+                const wrapper = clone.querySelector('.device-wrapper');
+                wrapper.id = `card-${data.device_uid}`;
+
+                clone.querySelector('.btn-charts').href = `/charts?device=${data.device_uid}`;
+                clone.querySelector('.btn-history').href = `/api/export/history/${data.device_uid}`;
+                // Якщо користувач не менеджер, не аналітик - ховаємо кнопку історії
+                if (userRole !== 'manager' && userRole !== 'analyst') {
+                    const historyBtn = clone.querySelector('.btn-history');
+                    if (historyBtn) historyBtn.style.display = 'none';
+                }
+
+                clone.querySelector('.device-uid').textContent = data.device_uid;
+                devicesGrid.appendChild(clone);
+                card = wrapper;
+            }
+
+            // Анімація оновлення
+            const metricBoxes = card.querySelectorAll('.metric-box');
+            metricBoxes.forEach(box => {
+                box.classList.add('updated');
+                setTimeout(() => box.classList.remove('updated'), 300);
+            });
+
+            // Оновлення значень
+            const safeFixed = (val, d = 1) => (val !== undefined && val !== null) ? Number(val).toFixed(d) : '-';
+
+            card.querySelector('.val-air').textContent = safeFixed(data.air_temp) + ' K';
+            card.querySelector('.val-process').textContent = safeFixed(data.process_temp) + ' K';
+            card.querySelector('.val-speed').textContent = safeFixed(data.rotational_speed, 0) + ' rpm';
+            card.querySelector('.val-torque').textContent = safeFixed(data.torque) + ' Nm';
+            card.querySelector('.val-wear').textContent = safeFixed(data.tool_wear) + ' min';
+
+            // Прогрес бар
+            const wearPercent = Math.min((data.tool_wear / 240) * 100, 100);
+            const wearBar = card.querySelector('.wear-bar');
+            wearBar.style.width = `${wearPercent}%`;
+
+            if (wearPercent > 90) wearBar.className = 'progress-bar bg-danger wear-bar';
+            else if (wearPercent > 70) wearBar.className = 'progress-bar bg-warning wear-bar';
+            else wearBar.className = 'progress-bar bg-info wear-bar';
+
+            // RUL
+            const rulEl = card.querySelector('.val-rul');
+
+            if (data.status === 'emergency') {
+                rulEl.textContent = '0.0 min';
+                rulEl.className = 'h4 mb-0 fw-bold rul-value val-rul text-danger';
+
+            } else if (data.prediction && data.prediction.rul !== null) {
+                rulEl.textContent = Number(data.prediction.rul).toFixed(1) + ' min';
+                rulEl.className = 'h4 mb-0 fw-bold rul-value val-rul text-primary';
+            } else {
+                rulEl.textContent = '...';
+                rulEl.className = 'h4 mb-0 fw-bold rul-value val-rul text-muted';
+            }
+
+            // --- ЛОГІКА СТАТУСІВ ---
+            const statusBadge = card.querySelector('.status-badge');
+            const failureAlert = card.querySelector('.failure-alert');
+            const cardMain = card.querySelector('.device-card');
+
+            // Скидаємо стилі помилки (очищення)
+            failureAlert.style.display = 'none';
+            cardMain.style.borderLeft = 'none';
+
+            if (data.status === 'normal') {
+                statusBadge.className = 'badge rounded-pill bg-success status-badge';
+                statusBadge.textContent = '🟢 Норма';
+
+            } else if (data.status === 'risk') {
+                statusBadge.className = 'badge rounded-pill bg-warning text-dark status-badge';
+                statusBadge.textContent = '🟡 Ризик';
+
+            } else if (data.status === 'emergency') {
+                statusBadge.className = 'badge rounded-pill bg-danger status-badge';
+                statusBadge.textContent = '🔴 АВАРІЯ';
+                cardMain.style.borderLeft = '5px solid #dc3545';
+
+                // Показуємо деталі помилки
+                if (data.detected_failure && data.detected_failure !== 'Normal') {
+                    failureAlert.style.display = 'block';
+                    card.querySelector('.failure-text').textContent = data.detected_failure;
+                }
+            } else {
+                statusBadge.className = 'badge rounded-pill bg-secondary status-badge';
+                statusBadge.textContent = '⏳ ...';
+            }
+
+            card.querySelector('.last-updated').textContent = 'Оновлено: ' + new Date().toLocaleTimeString();
+        }
+
+        document.addEventListener('DOMContentLoaded', connect);
+    </script>
+</body>
+
+</html>

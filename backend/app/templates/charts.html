@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Графіки пристрою</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            height: 400px;
+            position: relative;
+            transition: background-color 0.5s ease;
+        }
+
+        .chart-container.normal {
+            background: linear-gradient(135deg, #f8fff8 0%, #e8f5e8 100%);
+        }
+
+        .chart-container.warning {
+            background: linear-gradient(135deg, #fff8f0 0%, #fff0e0 100%);
+        }
+
+        .chart-container.critical {
+            background: linear-gradient(135deg, #fff0f0 0%, #ffe0e0 100%);
+        }
+
+        .chart-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .device-info {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .back-button {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+
+        .back-button:hover {
+            background: #0056b3;
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .update-time {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 10px;
+        }
+
+        .threshold-info {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .critical-value {
+            color: #dc3545;
+            font-weight: bold;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+
+        .status-normal {
+            background-color: #28a745;
+        }
+
+        .status-warning {
+            background-color: #ffc107;
+        }
+
+        .status-critical {
+            background-color: #dc3545;
+        }
+
+        /* Стилі для панелі керування */
+        .control-panel {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .control-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .scenario-selector {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .scenario-button {
+            background: #6c757d;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        .scenario-button:hover {
+            background: #5a6268;
+        }
+
+        .scenario-button.active {
+            background: #28a745;
+        }
+
+        .status-message {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="connection-status" class="connection-status">
+        Оновлення: Активне
+    </div>
+
+    <div class="container">
+        <button class="back-button" onclick="window.history.back()">← Назад</button>
+
+        <!-- Панель керування -->
+        <div class="control-panel">
+            <div class="control-title">Керування пристроєм</div>
+
+            <div class="scenario-selector">
+                <span>Сценарії:</span>
+                <button class="scenario-button" data-scenario="normal" onclick="changeScenario('normal')">Нормальний
+                    стан</button>
+                <button class="scenario-button" data-scenario="twf" onclick="changeScenario('twf')">Знос
+                    інструменту</button>
+                <button class="scenario-button" data-scenario="hdf" onclick="changeScenario('hdf')">Проблема
+                    теплообміну</button>
+                <button class="scenario-button" data-scenario="pwf" onclick="changeScenario('pwf')">Проблеми з
+                    потужністю</button>
+                <button class="scenario-button" data-scenario="osf"
+                    onclick="changeScenario('osf')">Перевантаження</button>
+                <button class="scenario-button" data-scenario="rnf" onclick="changeScenario('rnf')">Випадкова
+                    відмова</button>
+                <button class="scenario-button" data-scenario="worn_stress"
+                    onclick="changeScenario('worn_stress')">Старе/Навантажене обладнання</button>
+            </div>
+        </div>
+
+        <div class="device-info">
+            <h2>Графіки пристрою: <span id="device-uid"></span></h2>
+            <p>Тип продукту: <span id="product-type"></span></p>
+            <p>Поточний сценарій: <span id="current-scenario">-</span></p>
+            <p class="update-time">Останнє оновлення: <span id="last-update">-</span></p>
+        </div>
+
+        <div class="control-panel" id="history-panel" style="display: none;">
+            <div class="control-title">Історичний аналіз</div>
+            <div style="display: flex; gap: 10px; align-items: end; flex-wrap: wrap;">
+                <div>
+                    <label class="small text-muted">Від:</label>
+                    <input type="datetime-local" id="start-date" class="form-control">
+                </div>
+                <div>
+                    <label class="small text-muted">До:</label>
+                    <input type="datetime-local" id="end-date" class="form-control">
+                </div>
+                <button onclick="loadHistory()" class="back-button" style="margin: 0; background: #6c757d;">
+                    Графік
+                </button>
+                <button onclick="downloadHistoryCSV()" class="back-button" style="margin: 0; background: #0d6efd;">
+                    CSV
+                </button>
+                <button onclick="resetToLive()" class="back-button" style="margin: 0; background: #28a745;">
+                    Live
+                </button>
+            </div>
+        </div>
+
+        <div class="chart-container normal" id="airTempChart-container">
+            <div class="chart-title"><span class="status-indicator status-normal"></span>Температура повітря</div>
+            <div class="threshold-info">Норма: 296-304 K | <span class="critical-value">Критично: >306K або <294
+                        K</span>
+            </div>
+            <canvas id="airTempChart"></canvas>
+        </div>
+
+        <div class="chart-container normal" id="processTempChart-container">
+            <div class="chart-title"><span class="status-indicator status-normal"></span>Температура процесу</div>
+            <div class="threshold-info">Норма: 308-312 K | <span class="critical-value">Критично: >314K або <306
+                        K</span>
+            </div>
+            <canvas id="processTempChart"></canvas>
+        </div>
+
+        <div class="chart-container normal" id="speedChart-container">
+            <div class="chart-title"><span class="status-indicator status-normal"></span>Швидкість обертання</div>
+            <div class="threshold-info">Норма: 1380-2500 RPM | <span class="critical-value">Критично: <1380 або>2500
+                        RPM</span></div>
+            <canvas id="speedChart"></canvas>
+        </div>
+
+        <div class="chart-container normal" id="torqueChart-container">
+            <div class="chart-title"><span class="status-indicator status-normal"></span>Крутний момент</div>
+            <div class="threshold-info">Норма: 30-50 Nm | <span class="critical-value">Критично: <20 або>60 Nm</span>
+            </div>
+            <canvas id="torqueChart"></canvas>
+        </div>
+
+        <div class="chart-container normal" id="wearChart-container">
+            <div class="chart-title"><span class="status-indicator status-normal"></span>Знос інструменту</div>
+            <div class="threshold-info">Норма: 0-180 units | Попередження: 180-240 units | <span
+                    class="critical-value">Критично: ≥240 units (TWF)</span></div>
+            <canvas id="wearChart"></canvas>
+        </div>
+
+        <div class="chart-container normal" id="powerChart-container">
+            <div class="chart-title"><span class="status-indicator status-normal"></span>Потужність</div>
+            <div class="threshold-info">Норма: 3500-9000 W | <span class="critical-value">Критично: <3000 або>10000 W
+                        (PWF)</span></div>
+            <canvas id="powerChart"></canvas>
+        </div>
+
+        <div class="chart-container normal" id="tempDiffChart-container">
+            <div class="chart-title"><span class="status-indicator status-normal"></span>Різниця температур (t процесу -
+                t повітря)</div>
+            <div class="threshold-info">Норма: >8.6°C | <span class="critical-value">Критично: ≤8.6°C (HDF)</span></div>
+            <canvas id="tempDiffChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // Обмеження з симулятора
+        const thresholds = {
+            // Температура повітря: 300K ± 2σ (стандартне відхилення 2K)
+            // Нормальний діапазон: 296-304K (95% даних)
+            // Критично: виходить за 3σ (>306K або <294K)
+            air_temp: {
+                normal_min: 296,      // 300 - 2*2
+                normal_max: 304,      // 300 + 2*2
+                critical_low: 294,    // 300 - 3*2
+                critical_high: 306    // 300 + 3*2
+            },
+
+            // Температура процесу: air_temp + 10K ± 1σ (стандартне відхилення 1K)
+            // Нормальний діапазон: 308-312K
+            // Критично: >314K або <306K
+            process_temp: {
+                normal_min: 308,      // 310 - 2*1
+                normal_max: 312,      // 310 + 2*1
+                critical_low: 306,    // 310 - 4*1
+                critical_high: 314    // 310 + 4*1
+            },
+
+            // Швидкість обертання:
+            // КРИТИЧНО для HDF: < 1380 rpm (при малій різниці температур)
+            // Діапазон у датасеті: ~1200-2800 rpm
+            rotational_speed: {
+                normal_min: 1380,     // Поріг для HDF
+                normal_max: 2500,
+                critical_low: 1380,   // HDF умова
+                critical_high: 2800   // Максимум
+            },
+
+            // Крутний момент: нормальний розподіл навколо 40Nm, SD=10Nm
+            // Нормальний діапазон: 30-50Nm (1σ)
+            // Критично для OSF: в комбінації з tool_wear
+            torque: {
+                normal_min: 30,       // 40 - 10
+                normal_max: 50,       // 40 + 10
+                critical_low: 20,     // 40 - 2*10
+                critical_high: 60     // 40 + 2*10
+            },
+
+            // Знос інструменту:
+            // TWF: 200-240 хвилин (може вийти з ладу або бути замінено)
+            tool_wear: {
+                normal_max: 180,      // Нормальна робота
+                warning: 200,         // Початок критичного діапазону TWF
+                critical: 240         // Максимум перед обов'язковим збоєм
+            },
+
+            // Потужність: Torque × Speed (БЕЗ конверсії rad/s у датасеті!)
+            // PWF: < 3500W або > 9000W
+            power: {
+                normal_min: 3500,
+                normal_max: 9000,
+                critical_low: 3500,   // PWF умова (менше)
+                critical_high: 9000   // PWF умова (більше)
+            },
+
+            // Різниця температур (Process - Air):
+            // HDF: < 8.6K (при швидкості < 1380 rpm)
+            temp_difference: {
+                normal_min: 8.6,      // Мінімальна нормальна різниця
+                critical: 8.6,        // HDF умова (менше або дорівнює)
+                warning: 9.0          // Попередження при наближенні
+            },
+
+            // Додатково: OSF (Overstrain) - добуток tool_wear × torque
+            // L варіант: > 11,000 minNm
+            // M варіант: > 12,000 minNm  
+            // H варіант: > 13,000 minNm
+            overstrain: {
+                L: { critical: 11000 },
+                M: { critical: 12000 },
+                H: { critical: 13000 }
+            }
+        };
+
+        // Назви сценаріїв для відображення
+        const scenarioNames = {
+            normal: "Нормальний стан",
+            twf: "Знос інструменту",
+            hdf: "Проблема теплообміну",
+            pwf: "Проблема потужності",
+            osf: "Перевантаження",
+            rnf: "Випадкова відмова",
+            worn_stress: "Старе під навантаженням"
+        };
+
+        let deviceUid = new URLSearchParams(window.location.search).get('device');
+        if (!deviceUid) {
+            deviceUid = 'dev-1';
+        }
+
+        document.getElementById('device-uid').textContent = deviceUid;
+
+        // Колірна схема
+        const colors = {
+            primary: 'rgba(54, 162, 235, 0.8)',
+            warning: 'rgba(255, 159, 64, 0.8)',
+            critical: 'rgba(255, 99, 132, 0.8)',
+            criticalBg: 'rgba(255, 99, 132, 0.1)',
+            warningBg: 'rgba(255, 159, 64, 0.1)'
+        };
+
+        let charts = {};
+        let ws = null;
+        let chartStatus = {};
+        let currentScenario = 'normal';
+
+        function downloadHistoryCSV() {
+            const start = document.getElementById('start-date').value;
+            const end = document.getElementById('end-date').value;
+
+            let url = `/api/export/history/${deviceUid}`;
+
+            // Якщо дати вибрані - додаємо їх у запит
+            if (start && end) {
+                url += `?start_date=${start}&end_date=${end}`;
+            } else {
+                // Якщо дати не вибрані, питаємо користувача
+                if (!confirm("Дати не обрано. Завантажити повну історію (останні 5000 записів)?")) {
+                    return;
+                }
+            }
+
+            // Відкриваємо посилання, щоб почалося завантаження
+            window.location.href = url;
+        }
+
+        // =============================================
+        // ФУНКЦІЇ КЕРУВАННЯ ПРИСТРОЄМ
+        // =============================================
+
+        // Відправка команди на сервер
+        async function sendCommand(action, scenario = null) {
+            try {
+                const command = {
+                    device_uid: deviceUid,
+                    action: action
+                };
+
+                if (scenario) {
+                    command.scenario = scenario;
+                }
+
+                const response = await fetch('/api/device/control', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(command)
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    if (scenario) {
+                        updateScenarioDisplay(scenario);
+                    }
+                    console.log('Команду виконано:', action, scenario);
+                } else {
+                    console.error('Помилка сервера:', result.message);
+                    alert('Помилка: ' + result.message);
+                }
+
+            } catch (error) {
+                console.error('Помилка зв\'язку:', error);
+            }
+        }
+
+        // Зміна сценарію
+        function changeScenario(scenario) {
+            currentScenario = scenario;
+            sendCommand('change_scenario', scenario);
+        }
+
+        // Оновлення відображення поточного сценарію
+        function updateScenarioDisplay(scenario) {
+            document.getElementById('current-scenario').textContent = scenarioNames[scenario] || scenario;
+
+            // Оновлюємо активну кнопку сценарію
+            document.querySelectorAll('.scenario-button').forEach(button => {
+                if (button.dataset.scenario === scenario) {
+                    button.classList.add('active');
+                } else {
+                    button.classList.remove('active');
+                }
+            });
+        }
+
+        // =============================================
+        // WebSocket та графіки
+        // =============================================
+
+        // WebSocket для реального часу
+        function connectWebSocket() {
+            const statusElement = document.getElementById('connection-status');
+
+            try {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/api/ws/live`;
+
+                ws = new WebSocket(wsUrl);
+
+                ws.onopen = function (event) {
+                    console.log('WebSocket connected for charts');
+                    statusElement.textContent = 'Оновлення: Активне';
+                    statusElement.className = 'connection-status';
+                };
+
+                ws.onmessage = function (event) {
+                    try {
+                        const data = JSON.parse(event.data);
+
+                        if (data.type === 'live_data' && data.device_uid === deviceUid) {
+
+                            const sentTime = new Date(data.timestamp).getTime();
+                            const now = new Date().getTime();
+                            const latency = now - sentTime;
+                            console.log("End-to-End Latency:", latency, "ms");
+
+                            updateChartsWithNewData(data);
+
+                            // Оновлюємо інформацію про сценарій
+                            if (data.scenario && data.scenario !== currentScenario) {
+                                currentScenario = data.scenario;
+                                updateScenarioDisplay(data.scenario);
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Помилка парсингу даних:', e);
+                    }
+                };
+
+                ws.onclose = function (event) {
+                    console.log('WebSocket disconnected for charts');
+                    statusElement.textContent = 'Оновлення: Відключено';
+                    statusElement.className = 'connection-status disconnected';
+
+                    setTimeout(connectWebSocket, 3000);
+                };
+
+                ws.onerror = function (error) {
+                    console.error('WebSocket error:', error);
+                    statusElement.textContent = 'Оновлення: Помилка';
+                    statusElement.className = 'connection-status disconnected';
+                };
+
+            } catch (error) {
+                console.error('Failed to create WebSocket:', error);
+            }
+        }
+
+        // Оновлення графіків з новими даними
+        function updateChartsWithNewData(data) {
+            if (Object.keys(charts).length === 0) {
+                console.log('Графіки ще не створені');
+                return;
+            }
+
+            const timestamp = new Date().toLocaleTimeString();
+
+            document.getElementById('last-update').textContent = timestamp;
+
+            // Оновлюємо дані з перевіркою на критичні значення
+            updateChartWithThresholds(charts.airTempChart, timestamp, data.air_temp, 'air_temp');
+            updateChartWithThresholds(charts.processTempChart, timestamp, data.process_temp, 'process_temp');
+            updateChartWithThresholds(charts.speedChart, timestamp, data.rotational_speed, 'rotational_speed');
+            updateChartWithThresholds(charts.torqueChart, timestamp, data.torque, 'torque');
+            updateChartWithThresholds(charts.wearChart, timestamp, data.tool_wear, 'tool_wear');
+
+            // Розрахункові метрики
+            const power = data.torque * data.rotational_speed * 2 * 3.14159 / 60;
+            const tempDiff = data.process_temp - data.air_temp;
+
+            updateChartWithThresholds(charts.powerChart, timestamp, power, 'power');
+            updateChartWithThresholds(charts.tempDiffChart, timestamp, tempDiff, 'temp_difference');
+        }
+
+        // Оновлення графіка з перевіркою порогів
+        function updateChartWithThresholds(chart, timestamp, value, metricType) {
+            if (!chart) return;
+
+            // Обмежуємо кількість точок
+            if (chart.data.labels.length > 30) {
+                chart.data.labels.shift();
+                chart.data.datasets[0].data.shift();
+            }
+
+            chart.data.labels.push(timestamp);
+            chart.data.datasets[0].data.push(value);
+
+            // Визначаємо статус на основі значення
+            const threshold = thresholds[metricType];
+            let status = 'normal';
+
+            if (threshold) {
+                if (threshold.critical !== undefined) {
+                    if (metricType === 'temp_difference') {
+                        if (value <= threshold.critical) status = 'critical';
+                    } else {
+                        if (value >= threshold.critical) status = 'critical';
+                    }
+                } else if (threshold.critical_low !== undefined && threshold.critical_high !== undefined) {
+                    if (value <= threshold.critical_low || value >= threshold.critical_high) {
+                        status = 'critical';
+                    }
+                }
+
+                // Перевірка попередження для зносу
+                if (metricType === 'tool_wear' && value >= threshold.warning && value < threshold.critical) {
+                    status = 'warning';
+                }
+            }
+
+            // Зберігаємо статус для цього графіка
+            chartStatus[metricType] = status;
+
+            // Змінюємо колір лінії та фон контейнера
+            updateChartAppearance(chart, metricType, status, value);
+
+            chart.update('none');
+        }
+
+        // Оновлення вигляду графіка
+        function updateChartAppearance(chart, metricType, status, value) {
+            const containerId = chart.canvas.id + '-container';
+            const container = document.getElementById(containerId);
+            const statusIndicator = container.querySelector('.status-indicator');
+
+            // Оновлюємо фон контейнера
+            container.className = `chart-container ${status}`;
+
+            // Оновлюємо індикатор статусу
+            statusIndicator.className = `status-indicator status-${status}`;
+
+            // Оновлюємо колір лінії графіка
+            switch (status) {
+                case 'critical':
+                    chart.data.datasets[0].borderColor = colors.critical;
+                    chart.data.datasets[0].pointBackgroundColor = colors.critical;
+                    chart.data.datasets[0].backgroundColor = colors.criticalBg;
+                    break;
+                case 'warning':
+                    chart.data.datasets[0].borderColor = colors.warning;
+                    chart.data.datasets[0].pointBackgroundColor = colors.warning;
+                    chart.data.datasets[0].backgroundColor = colors.warningBg;
+                    break;
+                default:
+                    chart.data.datasets[0].borderColor = colors.primary;
+                    chart.data.datasets[0].pointBackgroundColor = colors.primary;
+                    chart.data.datasets[0].backgroundColor = 'rgba(54, 162, 235, 0.1)';
+            }
+        }
+
+        // Завантаження початкових даних
+        async function loadInitialChartsData() {
+            // 1. Спочатку створюємо графіки (порожні)
+            createChartsWithThresholds();
+
+            try {
+                const response = await fetch(`/api/device/${deviceUid}/charts`);
+                const data = await response.json();
+
+                if (!data.error) {
+                    document.getElementById('product-type').textContent = data.product_type || 'Невідомо';
+
+                    if (data.scenario) {
+                        currentScenario = data.scenario;
+                        updateScenarioDisplay(data.scenario);
+                    }
+
+                    // 2. ЗАПОВНЮЄМО ГРАФІКИ ІСТОРІЄЮ
+                    if (data.charts) {
+                        // Карта відповідності ключів API до об'єктів графіків
+                        const chartMapping = {
+                            'air_temp': 'airTempChart',
+                            'process_temp': 'processTempChart',
+                            'rotational_speed': 'speedChart',
+                            'torque': 'torqueChart',
+                            'tool_wear': 'wearChart',
+                            'power': 'powerChart',
+                            'temp_difference': 'tempDiffChart'
+                        };
+
+                        // Проходимо по всіх метриках
+                        for (const [apiKey, chartName] of Object.entries(chartMapping)) {
+                            // Перевіряємо, чи є дані для цього графіка
+                            if (data.charts[apiKey] && charts[chartName]) {
+                                const historicalData = data.charts[apiKey].data;
+
+                                // Додаємо точки на графік
+                                historicalData.forEach(point => {
+                                    // Конвертуємо час у читабельний формат, як у live-оновленні
+                                    const timeLabel = new Date(point.x).toLocaleTimeString();
+
+                                    // Використовуємо існуючу функцію, щоб зберегти логіку кольорів (червоний/зелений)
+                                    updateChartWithThresholds(charts[chartName], timeLabel, point.y, apiKey);
+                                });
+
+                                charts[chartName].update();
+                            }
+                        }
+                        console.log('Історичні дані завантажено');
+                    }
+                }
+
+            } catch (error) {
+                console.error('Помилка завантаження даних:', error);
+                document.getElementById('product-type').textContent = 'Помилка завантаження';
+            }
+        }
+
+        // Створення графіків
+        function createChartsWithThresholds() {
+            const commonOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 0 },
+                interaction: { intersect: false, mode: 'index' },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            afterLabel: function (context) {
+                                const value = context.raw;
+                                const datasetIndex = context.datasetIndex;
+                                let status = '🟢 Норма';
+
+                                if (datasetIndex === 0) {
+                                    const chartId = context.chart.canvas.id;
+
+                                    // Логіка для кожного типу графіка
+                                    if (chartId === 'wearChart') {
+                                        if (value >= thresholds.tool_wear.critical) status = '🔴 КРИТИЧНО (TWF)';
+                                        else if (value >= thresholds.tool_wear.warning) status = '🟡 Попередження';
+
+                                    } else if (chartId === 'tempDiffChart') {
+                                        if (value <= thresholds.temp_difference.critical) status = '🔴 КРИТИЧНО (HDF)';
+
+                                    } else if (chartId === 'powerChart') {
+                                        if (value <= thresholds.power.critical_low || value >= thresholds.power.critical_high)
+                                            status = '🔴 КРИТИЧНО (PWF)';
+
+                                    } else if (chartId === 'airTempChart') {
+                                        if (value <= thresholds.air_temp.critical_low || value >= thresholds.air_temp.critical_high)
+                                            status = '🔴 КРИТИЧНО';
+
+                                    } else if (chartId === 'processTempChart') {
+                                        if (value <= thresholds.process_temp.critical_low || value >= thresholds.process_temp.critical_high)
+                                            status = '🔴 КРИТИЧНО';
+
+                                    } else if (chartId === 'speedChart') {
+                                        if (value <= thresholds.rotational_speed.critical_low || value >= thresholds.rotational_speed.critical_high)
+                                            status = '🔴 КРИТИЧНО';
+
+                                    } else if (chartId === 'torqueChart') {
+                                        if (value <= thresholds.torque.critical_low || value >= thresholds.torque.critical_high)
+                                            status = '🔴 КРИТИЧНО';
+                                    }
+                                }
+                                return `Статус: ${status}`;
+                            }
+                        }
+                    },
+                    legend: { display: false }
+                },
+                scales: {
+                    x: { title: { display: true, text: 'Час' } },
+                    y: {
+                        title: { display: true, text: '' },
+                        beginAtZero: true
+                    }
+                }
+            };
+
+            charts.airTempChart = createChart('airTempChart', 'Температура повітря', 'K', commonOptions);
+            charts.processTempChart = createChart('processTempChart', 'Температура процесу', 'K', commonOptions);
+            charts.speedChart = createChart('speedChart', 'Швидкість обертання', 'RPM', commonOptions);
+            charts.torqueChart = createChart('torqueChart', 'Крутний момент', 'Nm', commonOptions);
+            charts.wearChart = createChart('wearChart', 'Знос інструменту', 'units', commonOptions);
+            charts.powerChart = createChart('powerChart', 'Потужність', 'W', commonOptions);
+            charts.tempDiffChart = createChart('tempDiffChart', 'Різниця температур', 'K', commonOptions);
+
+            console.log('Графіки створені');
+        }
+
+        // Створення графіка
+        function createChart(canvasId, title, unit, options) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) {
+                console.error('Canvas element не знайдено:', canvasId);
+                return null;
+            }
+
+            const existingChart = Chart.getChart(ctx);
+            if (existingChart) {
+                existingChart.destroy();
+            }
+
+            const chartOptions = { ...options };
+            chartOptions.scales.y.title.text = unit;
+
+            return new Chart(ctx.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: title,
+                        data: [],
+                        borderColor: colors.primary,
+                        backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: colors.primary,
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 1,
+                        fill: false,
+                        tension: 0.1
+                    }]
+                },
+                options: chartOptions
+            });
+        }
+
+        const userRole = "{{ user.role }}";
+
+        // Приховуємо/показуємо панель історії
+        if (userRole === 'analyst' || userRole === 'admin') {
+            document.getElementById('history-panel').style.display = 'block';
+        }
+
+        // Функція завантаження історії
+        async function loadHistory() {
+            const start = document.getElementById('start-date').value;
+            const end = document.getElementById('end-date').value;
+
+            if (!start || !end) {
+                alert("Будь ласка, оберіть обидві дати");
+                return;
+            }
+
+            // Зупиняємо Live оновлення (закриваємо сокет або ігноруємо його)
+            if (ws) ws.close();
+            document.getElementById('connection-status').textContent = 'Режим історії';
+            document.getElementById('connection-status').className = 'connection-status status-warning';
+
+            try {
+                // Запит з датами
+                const response = await fetch(`/api/device/${deviceUid}/charts?start_date=${start}&end_date=${end}`);
+                const data = await response.json();
+
+                if (data.charts) {
+                    updateAllCharts(data.charts);
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Помилка завантаження історії");
+            }
+        }
+
+        // Повернення до Live режиму
+        function resetToLive() {
+            window.location.reload(); // Найпростіший спосіб повернути все як було
+        }
+
+        // Допоміжна функція для повного перемальовування
+        function updateAllCharts(chartsData) {
+            const chartMapping = {
+                'air_temp': 'airTempChart',
+                'process_temp': 'processTempChart',
+                'rotational_speed': 'speedChart',
+                'torque': 'torqueChart',
+                'tool_wear': 'wearChart',
+                'power': 'powerChart',
+                'temp_difference': 'tempDiffChart'
+            };
+
+            for (const [apiKey, chartName] of Object.entries(chartMapping)) {
+                if (chartsData[apiKey] && charts[chartName]) {
+                    const chart = charts[chartName];
+
+                    // Очищаємо старі дані
+                    chart.data.labels = [];
+                    chart.data.datasets[0].data = [];
+
+                    // Заливаємо нові
+                    chartsData[apiKey].data.forEach(point => {
+                        chart.data.labels.push(new Date(point.x).toLocaleString());
+                        chart.data.datasets[0].data.push(point.y);
+                    });
+
+                    chart.update();
+                }
+            }
+        }
+
+        // Ініціалізація
+        document.addEventListener('DOMContentLoaded', function () {
+            console.log('Сторінка завантажена');
+            loadInitialChartsData();
+            connectWebSocket();
+            updateScenarioDisplay(currentScenario);
+        });
+    </script>
+</body>
+
+</html>
